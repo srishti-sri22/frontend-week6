@@ -1,6 +1,5 @@
 import { log } from "console";
 
-// lib/api.ts
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 export interface Poll {
@@ -18,7 +17,7 @@ export interface PollOption {
   id: string;
   text: string;
   votes: number;
-  voters: string[];  // Array of user string IDs who voted
+  voters: string[];  
 }
 
 export const authApi = {
@@ -180,12 +179,12 @@ export const pollApi = {
 
   changeVote: async (pollId: string, userId: string, optionId: string): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/${pollId}/change/vote`, {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ 
-        user_id: userId,      // String ID
-        option_id: optionId   // String ID
+        user_id: userId,      
+        option_id: optionId  
       }),
     });
     if (!response.ok) {
@@ -237,4 +236,15 @@ export const pollApi = {
   getLiveResults: (pollId: string): EventSource => {
     return new EventSource(`${API_BASE_URL}/polls/${pollId}/results?live=true`);
   },
+
+  checkUserVote: async (pollId: string, userId: string): Promise<{ has_voted: boolean; option_id?: string }> => {
+  const response = await fetch(`${API_BASE_URL}/polls/${pollId}/vote/check?user_id=${userId}`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    return { has_voted: false };
+  }
+  return response.json();
+},
 };
