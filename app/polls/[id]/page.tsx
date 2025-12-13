@@ -9,17 +9,19 @@ import { getUsername, getUserId, isAuthenticated } from '@/lib/auth';
 export default function PollDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const pollId = params.id as string; // Extract id from params
+  const pollId = params.id as string;
   
   console.log("Poll id of the person is:", pollId);
   
   const [poll, setPoll] = useState<Poll | null>(null);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
+  const [changingVote, setChangingVote] = useState(false);
   const [error, setError] = useState('');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [isEditingVote, setIsEditingVote] = useState(false);
   
   const userId = getUserId();
 
@@ -29,8 +31,7 @@ export default function PollDetailPage() {
   }, []);
 
   useEffect(() => {
-      fetchPoll();
-
+    fetchPoll();
   }, [pollId]);
 
   const fetchPoll = async () => {
@@ -39,10 +40,29 @@ export default function PollDetailPage() {
       setLoading(true);
       console.log("Fetching poll with ID:", pollId);
       const data = await pollApi.getPoll(pollId);
-      console.log(" data is",data);
-      console.log("api is",pollApi);
+      console.log("Poll data:", data);
 
       setPoll(data);
+      
+      // Check if current user has already voted by checking VoteRecord
+      if (userId) {
+        try {
+          const voteCheck = await pollApi.checkUserVote(pollId, userId);
+          console.log("Vote check result:", voteCheck);
+          
+          if (voteCheck.has_voted) {
+            setHasVoted(true);
+            // Optionally set the selected option to show which one they voted for
+            if (voteCheck.option_id) {
+              setSelectedOption(voteCheck.option_id);
+            }
+          }
+        } catch (voteCheckError) {
+          console.error("Error checking vote status:", voteCheckError);
+          // If check fails, assume not voted
+          setHasVoted(false);
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load poll');
     } finally {
@@ -58,18 +78,53 @@ export default function PollDetailPage() {
 
     try {
       setVoting(true);
-      console.log("pollId---->",pollId);
-      console.log("selectedOption--->",selectedOption);
-      console.log("userId-->",userId);
+      console.log("pollId---->", pollId);
+      console.log("selectedOption--->", selectedOption);
+      console.log("userId-->", userId);
 
       await pollApi.castVote(pollId, selectedOption, userId);
       setHasVoted(true);
+      setIsEditingVote(false);
       await fetchPoll();
     } catch (err: any) {
       setError(err.message || 'Failed to vote');
     } finally {
       setVoting(false);
     }
+  };
+
+  const handleChangeVote = async () => {
+    if (!selectedOption || !userId || !isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      setChangingVote(true);
+      console.log("Changing vote - pollId:", pollId);
+      console.log("New selectedOption:", selectedOption);
+      console.log("userId:", userId);
+
+      await pollApi.changeVote(pollId, userId, selectedOption);
+      setHasVoted(true);
+      setIsEditingVote(false);
+      await fetchPoll();
+    } catch (err: any) {
+      setError(err.message || 'Failed to change vote');
+    } finally {
+      setChangingVote(false);
+    }
+  };
+
+  const handleEditVote = () => {
+    setIsEditingVote(true);
+    setHasVoted(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingVote(false);
+    setHasVoted(true);
+    setSelectedOption(null);
   };
 
   if (loading) {
@@ -138,9 +193,19 @@ export default function PollDetailPage() {
 
           {/* Voting Section */}
           <div className="space-y-4">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {hasVoted ? 'Your vote has been recorded!' : 'Cast Your Vote'}
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                {hasVoted && !isEditingVote ? 'Your vote has been recorded!' : 'Cast Your Vote'}
+              </h2>
+              {hasVoted && !isEditingVote && isActive && (
+                <button
+                  onClick={handleEditVote}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold text-sm transition-colors"
+                >
+                  Change Vote
+                </button>
+              )}
+            </div>
 
             {poll.options.map((option) => {
               const percentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
@@ -149,13 +214,13 @@ export default function PollDetailPage() {
               return (
                 <div key={option.id} className="relative">
                   <button
-                    onClick={() => !hasVoted && isActive && setSelectedOption(option.id)}
-                    disabled={hasVoted || !isActive}
+                    onClick={() => (!hasVoted || isEditingVote) && isActive && setSelectedOption(option.id)}
+                    disabled={(hasVoted && !isEditingVote) || !isActive}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                       isSelected
                         ? 'border-blue-600 bg-blue-50'
                         : 'border-gray-200 hover:border-blue-400 hover:bg-gray-50'
-                    } ${(hasVoted || !isActive) ? 'cursor-default' : 'cursor-pointer'}`}
+                    } ${((hasVoted && !isEditingVote) || !isActive) ? 'cursor-default' : 'cursor-pointer'}`}
                   >
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-semibold text-gray-900">{option.text}</span>
@@ -178,8 +243,7 @@ export default function PollDetailPage() {
               );
             })}
           </div>
-
-          {/* Vote Button */}
+z
           {!hasVoted && isActive && (
             <button
               onClick={handleVote}
@@ -190,6 +254,25 @@ export default function PollDetailPage() {
             </button>
           )}
 
+          {isEditingVote && isActive && (
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={handleChangeVote}
+                disabled={!selectedOption || changingVote}
+                className="flex-1 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {changingVote ? 'Changing Vote...' : 'Confirm Change'}
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                disabled={changingVote}
+                className="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {!isAuthenticated() && (
             <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-yellow-800">
@@ -198,7 +281,7 @@ export default function PollDetailPage() {
             </div>
           )}
 
-          {hasVoted && (
+          {hasVoted && !isEditingVote && (
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-green-800 font-semibold">✓ Thank you for voting!</p>
             </div>

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authApi } from '@/lib/api';
+import { clearAuthData } from '@/lib/auth';
 
 interface NavbarProps {
   username?: string | null;
@@ -14,8 +15,7 @@ export default function Navbar({ username }: NavbarProps) {
   const handleLogout = async () => {
     try {
       await authApi.logout();
-      localStorage.removeItem('username');
-      localStorage.removeItem('userId');
+      clearAuthData();
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
