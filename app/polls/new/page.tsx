@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { pollApi } from '@/lib/api';
-import { getUsername, getUserId } from '@/lib/auth';
+import { useStore } from '@/lib/store';
+import { usePolls } from '@/hooks/usePolls';
 
 export default function CreatePollPage() {
   const router = useRouter();
-  const username = getUsername();
-  const user_id = getUserId();
+  const { username, userId } = useStore();
+  const { createPoll } = usePolls();
 
   const [title, setTitle] = useState('');
   const [options, setOptions] = useState(['', '']);
@@ -48,19 +48,16 @@ export default function CreatePollPage() {
       return;
     }
 
-    if (!user_id) {
+    if (!userId) {
       setError('User not authenticated');
       return;
     }
 
     try {
       setLoading(true);
-
-      const newPoll = await pollApi.createPoll(title.trim(), validOptions, user_id);
-      console.log("poll sent is",typeof newPoll.id);
+      const newPoll = await createPoll(title.trim(), validOptions, userId);
       router.push(`/polls/${newPoll.id}`);
     } catch (err: any) {
-        console.log("error is",err);
       setError(err.message || 'Failed to create poll');
     } finally {
       setLoading(false);
@@ -72,7 +69,7 @@ export default function CreatePollPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
         
-        <Navbar username={username} />
+        <Navbar />
         
         <main className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="mb-8 animate-fadeInUp">

@@ -4,16 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
-import { getUsername, isAuthenticated } from '@/lib/auth';
+import { useStore } from '@/lib/store';
 
 export default function LandingPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
+  const { username, isAuthenticated } = useStore();
 
   useEffect(() => {
     setMounted(true);
-    setUsername(getUsername());
   }, []);
 
   if (!mounted) {
@@ -24,12 +23,14 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
       <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
       
-      <Navbar username={username}/>
+      <Navbar />
       
       <main className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
 
         <div className="text-center mb-12 animate-fadeInUp">
-          
+          <div className="inline-block mb-6 px-4 py-2 bg-blue-100/50 backdrop-blur-sm rounded-full text-blue-700 font-medium text-sm animate-fadeInUp animation-delay-100">
+            ✨ Welcome to the future of polling
+          </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-6 leading-tight">
             Create polls that <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">matter</span>
@@ -39,7 +40,7 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {isAuthenticated() ? (
+            {isAuthenticated ? (
               <>
                 <Link 
                   href="/polls/new"
@@ -157,7 +158,7 @@ export default function LandingPage() {
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl shadow-2xl p-12 sm:p-16 text-white relative overflow-hidden">
             <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
             <div className="relative z-10">
-              {isAuthenticated() ? (
+              {isAuthenticated ? (
                 <>
                   <h2 className="text-3xl sm:text-4xl font-bold mb-4">Welcome back, {username}!</h2>
                   <p className="text-lg sm:text-xl mb-8 opacity-95 max-w-2xl mx-auto">

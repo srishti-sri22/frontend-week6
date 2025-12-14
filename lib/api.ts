@@ -9,8 +9,8 @@ export interface Poll {
   options: PollOption[];
   is_closed: boolean;
   created_at: string;
+  updated_at: string,
   total_votes: number;
-  updated_at: string;
 }
 
 export interface PollOption {
@@ -222,20 +222,6 @@ export const pollApi = {
     return response.json();
   },
 
-  getResults: async (pollId: string): Promise<Poll> => {
-    const response = await fetch(`${API_BASE_URL}/polls/${pollId}/results`, {
-      credentials: 'include'
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to get results');
-    }
-    return response.json();
-  },
-
-  getLiveResults: (pollId: string): EventSource => {
-    return new EventSource(`${API_BASE_URL}/polls/${pollId}/results?live=true`);
-  },
 
   checkUserVote: async (pollId: string, userId: string): Promise<{ has_voted: boolean; option_id?: string }> => {
   const response = await fetch(`${API_BASE_URL}/polls/${pollId}/vote/check?user_id=${userId}`, {

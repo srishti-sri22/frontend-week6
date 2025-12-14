@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import { authApi } from '@/lib/api';
-import { setAuthData } from '@/lib/auth';
+import { useStore } from '@/lib/store';
 import { b64ToBuf, bufToB64 } from '@/lib/webauthn';
 
 export default function LoginPage() {
   const router = useRouter();
+  const setUser = useStore((state) => state.setUser);
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -72,11 +73,16 @@ export default function LoginPage() {
       const response = await authApi.authFinish(username, credentialData);
       
       console.log('Authentication response:', response);
-      
       console.log({ response_user_id: response.user_id});
 
       if (response.success && response.username) {
-        setAuthData(response.username, response.user_id);
+        setUser(response.username, response.user_id);
+        
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('username', response.username);
+          localStorage.setItem('user_id', response.user_id);
+        }
+        
         router.push('/homepage');
       } else {
         throw new Error('Authentication completed but response format unexpected');

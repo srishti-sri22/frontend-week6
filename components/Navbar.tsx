@@ -2,30 +2,29 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authApi } from '@/lib/api';
-import { clearAuthData } from '@/lib/auth';
 import { useState } from 'react';
+import { authApi } from '@/lib/api';
+import { useStore } from '@/lib/store';
 
-interface NavbarProps {
-  username?: string | null;
-}
-
-export default function Navbar({ username }: NavbarProps) {
+export default function Navbar() {
   const router = useRouter();
+  const { username, isAuthenticated, clearUser } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
       await authApi.logout();
-      clearAuthData();
+      clearUser();
+      
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('username');
+        localStorage.removeItem('user_id');
+      }
+      
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
   };
 
   return (
@@ -37,11 +36,11 @@ export default function Navbar({ username }: NavbarProps) {
               href="/" 
               className="text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors duration-200 hover:scale-105 transform"
             >
-              Poll Poller Polled
+              Polling Poller Polled
             </Link>
           </div>
 
-          {username && (
+          {isAuthenticated && (
             <div className="hidden lg:flex items-center space-x-1">
               <Link 
                 href="/" 
@@ -71,7 +70,7 @@ export default function Navbar({ username }: NavbarProps) {
           )}
 
           <div className="hidden md:flex items-center space-x-3">
-            {username ? (
+            {isAuthenticated ? (
               <>
                 <span className="text-gray-700 text-sm sm:text-base">
                   Welcome, <strong className="text-blue-600">{username}</strong>
@@ -109,7 +108,7 @@ export default function Navbar({ username }: NavbarProps) {
 
           <div className="md:hidden">
             <button
-              onClick={toggleMobileMenu}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="text-gray-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-2 transition-colors duration-200"
               aria-label="Toggle menu"
             >
@@ -128,7 +127,7 @@ export default function Navbar({ username }: NavbarProps) {
 
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200 py-4 animate-fadeIn">
-            {username ? (
+            {isAuthenticated ? (
               <div className="flex flex-col space-y-2">
                 <div className="px-4 py-2 text-gray-700 text-sm border-b border-gray-100">
                   Welcome, <strong className="text-blue-600">{username}</strong>

@@ -1,37 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Navbar from '@/components/Navbar';
 import PollCard from '@/components/PollCard';
-import { pollApi, Poll } from '@/lib/api';
-import { getUsername } from '@/lib/auth';
+import { useStore } from '@/lib/store';
+import { usePolls } from '@/hooks/usePolls';
 
 export default function Homepage() {
-  const [polls, setPolls] = useState<Poll[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { username } = useStore();
+  const { polls, pollsLoading, pollsError, fetchAllPolls } = usePolls();
   const [filter, setFilter] = useState<'all' | 'active' | 'closed'>('all');
-  const [username, setUsername] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    setUsername(getUsername());
-  }, []);
+    fetchAllPolls();
+  }, [fetchAllPolls]);
 
   useEffect(() => {
-    fetchPolls();
-  }, []);
-
-  const fetchPolls = async () => {
-    try {
-      setLoading(true);
-      const data = await pollApi.getAllPolls();
-      setPolls(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load polls');
-    } finally {
-      setLoading(false);
+    if (!autoRefresh) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
     }
-  };
+
+    intervalRef.current = setInterval(() => {
+      fetchAllPolls();
+    }, 30000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [autoRefresh, fetchAllPolls]);
 
   const filteredPolls = polls.filter(poll => {
     if (filter === 'all') return true;
@@ -42,16 +46,35 @@ export default function Homepage() {
   const activeCount = polls.filter(p => !p.is_closed).length;
   const closedCount = polls.filter(p => p.is_closed).length;
 
+  const toggleAutoRefresh = () => {
+    setAutoRefresh(!autoRefresh);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <Navbar username={username} />
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <Navbar/>
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="mb-8 sm:mb-12 animate-fadeInUp">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-3">
-            All Polls
-          </h1>
-          <p className="text-gray-600 text-base sm:text-lg">Browse and vote on active polls from the community</p>
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-3">
+                All Polls
+              </h1>
+              <p className="text-gray-600 text-base sm:text-lg">Browse and vote on active polls from the community</p>
+            </div>
+            <button
+              onClick={toggleAutoRefresh}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-all duration-300 ${
+                autoRefresh 
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+              {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3 sm:gap-4 mb-8 animate-fadeInUp animation-delay-200">
@@ -96,7 +119,7 @@ export default function Homepage() {
             onClick={() => setFilter('closed')}
             className={`group px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg ${
               filter === 'closed'
-                ? 'bg-gradient-to-r from-red-600 to-red-700 text-white'
+                ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white'
                 : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -111,7 +134,7 @@ export default function Homepage() {
           </button>
         </div>
 
-        {loading && (
+        {pollsLoading && polls.length === 0 && (
           <div className="text-center py-16 sm:py-20 animate-fadeIn">
             <div className="relative">
               <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
@@ -121,15 +144,15 @@ export default function Homepage() {
           </div>
         )}
 
-        {error && (
+        {pollsError && (
           <div className="bg-red-50/80 backdrop-blur-sm border-2 border-red-200 rounded-2xl p-6 mb-8 shadow-lg animate-fadeInUp">
             <div className="flex items-start gap-4">
               <div className="text-3xl">⚠️</div>
               <div className="flex-1">
                 <p className="text-red-700 font-semibold text-lg mb-2">Oops! Something went wrong</p>
-                <p className="text-red-600 mb-4">{error}</p>
+                <p className="text-red-600 mb-4">{pollsError}</p>
                 <button
-                  onClick={fetchPolls}
+                  onClick={fetchAllPolls}
                   className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
                 >
                   Try Again
@@ -139,25 +162,29 @@ export default function Homepage() {
           </div>
         )}
 
-        {!loading && !error && (
+        {!pollsError && (
           <>
-            {filteredPolls.length === 0 ? (
+            {filteredPolls.length === 0 && polls.length > 0 ? (
+              <div className="text-center py-16 sm:py-20 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl animate-fadeInUp">
+                <div className="text-6xl sm:text-7xl mb-6">📊</div>
+                <p className="text-gray-700 text-xl sm:text-2xl font-bold mb-3">No {filter} polls found</p>
+                <p className="text-gray-500 text-base sm:text-lg mb-8">
+                  Try selecting a different filter
+                </p>
+              </div>
+            ) : filteredPolls.length === 0 ? (
               <div className="text-center py-16 sm:py-20 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl animate-fadeInUp">
                 <div className="text-6xl sm:text-7xl mb-6">📊</div>
                 <p className="text-gray-700 text-xl sm:text-2xl font-bold mb-3">No polls found</p>
                 <p className="text-gray-500 text-base sm:text-lg mb-8">
-                  {filter === 'all' 
-                    ? "Be the first to create a poll!" 
-                    : `No ${filter} polls available right now`}
+                  Be the first to create a poll!
                 </p>
-                {filter === 'all' && (
-                  <a 
-                    href="/polls/new"
-                    className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
-                  >
-                    Create Your First Poll
-                  </a>
-                )}
+                <a 
+                  href="/polls/new"
+                  className="inline-block px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 font-semibold text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                >
+                  Create Your First Poll
+                </a>
               </div>
             ) : (
               <div className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
@@ -173,6 +200,15 @@ export default function Homepage() {
               </div>
             )}
           </>
+        )}
+
+        {autoRefresh && polls.length > 0 && (
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              Auto-refreshing every 30 seconds
+            </p>
+          </div>
         )}
       </main>
 

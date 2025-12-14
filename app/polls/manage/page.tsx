@@ -4,46 +4,27 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { pollApi, Poll } from '@/lib/api';
-import { getUsername, getUserId } from '@/lib/auth';
+import { useStore } from '@/lib/store';
+import { usePolls } from '@/hooks/usePolls';
 
 export default function ManagePollsPage() {
   const router = useRouter();
-  const username = getUsername();
-  const userId = getUserId();
-
-  const [polls, setPolls] = useState<Poll[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { username, userId } = useStore();
+  const { userPolls, pollsLoading, pollsError, fetchUserPolls, closePoll, resetPoll } = usePolls();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) {
       fetchUserPolls();
     }
-  }, [userId]);
-
-  const fetchUserPolls = async () => {
-    if (!userId) return;
-    console.log(userId)
-    try {
-      setLoading(true);
-      const data = await pollApi.getUserPolls(userId);
-      setPolls(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load your polls');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [userId, fetchUserPolls]);
 
   const handleClosePoll = async (pollId: string) => {
     if (!userId || !confirm('Are you sure you want to close this poll?')) return;
 
     try {
       setActionLoading(pollId);
-      await pollApi.closePoll(pollId, userId);
-      await fetchUserPolls();
+      await closePoll(pollId, userId);
     } catch (err: any) {
       alert(err.message || 'Failed to close poll');
     } finally {
@@ -56,8 +37,7 @@ export default function ManagePollsPage() {
 
     try {
       setActionLoading(pollId);
-      await pollApi.resetPoll(pollId, userId);
-      await fetchUserPolls();
+      await resetPoll(pollId, userId);
     } catch (err: any) {
       alert(err.message || 'Failed to reset poll');
     } finally {
@@ -65,13 +45,13 @@ export default function ManagePollsPage() {
     }
   };
 
-  const activePolls = polls.filter(p => !p.is_closed).length;
-  const closedPolls = polls.filter(p => p.is_closed).length;
+  const activePolls = userPolls.filter(p => !p.is_closed).length;
+  const closedPolls = userPolls.filter(p => p.is_closed).length;
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-        <Navbar username={username} />
+        <Navbar  />
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 animate-fadeInUp">
@@ -99,7 +79,7 @@ export default function ManagePollsPage() {
             </button>
           </div>
 
-          {loading && (
+          {pollsLoading && (
             <div className="text-center py-16 sm:py-20 animate-fadeIn">
               <div className="relative">
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
@@ -109,15 +89,15 @@ export default function ManagePollsPage() {
             </div>
           )}
 
-          {error && (
+          {pollsError && (
             <div className="bg-red-50/80 backdrop-blur-sm border-2 border-red-200 rounded-2xl p-6 mb-8 shadow-lg animate-fadeInUp">
               <div className="flex items-start gap-4">
                 <div className="text-3xl">⚠️</div>
                 <div className="flex-1">
                   <p className="text-red-700 font-semibold text-lg mb-2">Oops! Something went wrong</p>
-                  <p className="text-red-600 mb-4">{error}</p>
+                  <p className="text-red-600 mb-4">{pollsError}</p>
                   <button
-                    onClick={fetchUserPolls}
+                    onClick={() => fetchUserPolls()}
                     className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
                   >
                     Try Again
@@ -127,9 +107,9 @@ export default function ManagePollsPage() {
             </div>
           )}
 
-          {!loading && !error && (
+          {!pollsLoading && !pollsError && (
             <>
-              {polls.length === 0 ? (
+              {userPolls.length === 0 ? (
                 <div className="text-center py-16 sm:py-20 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl animate-fadeInUp">
                   <div className="text-6xl sm:text-7xl mb-6">📊</div>
                   <p className="text-gray-700 text-xl sm:text-2xl font-bold mb-3">No polls yet</p>
@@ -145,7 +125,7 @@ export default function ManagePollsPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {polls.map((poll, index) => {
+                  {userPolls.map((poll, index) => {
                     const pollid = poll.id;
                     const isActive = !poll.is_closed;
                     const isLoading = actionLoading === poll.id;
