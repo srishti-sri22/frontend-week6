@@ -108,6 +108,14 @@ export default function PollDetailPage() {
       setTimeout(() => setAnimateOptions(true), 100);
     }
   }, [currentPoll]);
+  useEffect(() => {
+  if (currentPoll && currentPoll.total_votes === 0) {
+    useStore.getState().clearUserVote(pollId);
+    setSelectedOption(null);
+    setIsEditingVote(false);
+  }
+}, [currentPoll, pollId]);
+
 
   useEffect(() => {
     if (votedOptionId && !isEditingVote) {

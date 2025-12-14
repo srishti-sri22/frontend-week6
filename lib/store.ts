@@ -34,6 +34,7 @@ interface AppState extends UserState, PollState, VoteState {
   updateUserVote: (pollId: string, optionId: string) => void;
   getUserVote: (pollId: string) => { pollId: string; optionId: string } | null;
   clearVotes: () => void;
+  clearUserVote: (pollId: string) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -107,6 +108,13 @@ export const useStore = create<AppState>()(
       },
 
       clearVotes: () => set({ userVotes: {} }),
+
+      clearUserVote: (pollId) =>
+        set((state) => {
+          const updatedVotes = { ...state.userVotes };
+          delete updatedVotes[pollId];
+          return { userVotes: updatedVotes };
+        }),
     }),
     {
       name: 'poll-app-storage',

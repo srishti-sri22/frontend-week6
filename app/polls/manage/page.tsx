@@ -58,32 +58,28 @@ export default function ManagePollsPage() {
   };
   
   const handleResetPoll = async (pollId: string) => {
-    if (!userId) {
-      setError('You must be logged in to reset a poll');
-      return;
-    }
+  if (!userId) {
+    setError('You must be logged in to reset a poll');
+    return;
+  }
 
-    if (!confirm('Are you sure you want to reset this poll? All votes will be removed.')) return;
+  if (!confirm('Are you sure you want to reset this poll? All votes will be removed.')) return;
 
-    try {
-      setActionLoading(pollId);
-      setError('');
-      setSuccessMessage('');
-      await resetPoll(pollId, userId);
-      setSuccessMessage('Poll reset successfully');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err: any) {
-      logError(err, 'ManagePollsPage - Reset Poll');
-      const errorMessage = getUserFriendlyMessage(err);
-      setError(errorMessage);
-      
-      if (isAuthError(err)) {
-        setTimeout(() => router.push('/login'), 2000);
-      }
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  try {
+    setActionLoading(pollId);
+    setError('');
+    setSuccessMessage('');
+    await resetPoll(pollId, userId);
+    useStore.getState().clearUserVote(pollId);
+    setSuccessMessage('Poll reset successfully');
+    setTimeout(() => setSuccessMessage(''), 3000);
+  } catch (err: any) {
+    logError(err, 'ManagePollsPage - Reset Poll');
+    setError(getUserFriendlyMessage(err));
+  } finally {
+    setActionLoading(null);
+  }
+};
 
   const handleRetry = async () => {
     try {
