@@ -98,7 +98,6 @@ export const authApi = {
 
 export const pollApi = {
   createPoll: async (question: string, options: string[], creatorId: string): Promise<Poll> => {
-    console.log('Creating poll with creator_id:', creatorId);
     
     const response = await fetch(`${API_BASE_URL}/polls/create`, {
       method: 'POST',
@@ -135,7 +134,6 @@ export const pollApi = {
     const response = await fetch(`${API_BASE_URL}/polls/user/${userId}`, {
       credentials: 'include'
     });
-    console.log("Get User Polls", response);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || 'Failed to fetch user polls');
@@ -147,7 +145,6 @@ export const pollApi = {
     const response = await fetch(`${API_BASE_URL}/polls`, {
       credentials: 'include'
     });
-    console.log("getAllPolls function responsse", response);
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(errorText || 'Failed to fetch polls');
@@ -169,7 +166,6 @@ export const pollApi = {
 
       }),
     });
-    console.log(response);
     
     if (!response.ok) {
       const errorText = await response.text();

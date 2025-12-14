@@ -16,10 +16,8 @@ export const usePasskeyLogin = () => {
     setError(null);
 
     try {
-      console.log('Starting login for:', username);
 
       const options = await authApi.authStart(username);
-      console.log('Got auth options:', options);
 
       options.publicKey.challenge = b64ToBuf(options.publicKey.challenge);
       options.publicKey.allowCredentials = options.publicKey.allowCredentials.map((c: any) => ({
@@ -27,11 +25,7 @@ export const usePasskeyLogin = () => {
         id: b64ToBuf(c.id),
       }));
 
-      console.log('Calling navigator.credentials.get');
-
       const credential: any = await navigator.credentials.get(options);
-      
-      console.log('Credential received:', credential);
 
       const credentialPayload = {
         id: credential.id,
@@ -44,12 +38,7 @@ export const usePasskeyLogin = () => {
           userHandle: credential.response.userHandle ? bufToB64(credential.response.userHandle) : null,
         },
       };
-
-      console.log('Sending credential to server:', credentialPayload);
-
       const result = await authApi.authFinish(username, credentialPayload);
-      console.log('Login complete:', result);
-      
       setLoading(false);
       return result;
     } catch (err: any) {

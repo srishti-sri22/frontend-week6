@@ -27,7 +27,6 @@ export const usePasskeyRegister = () => {
             options.publicKey.user.id = b64ToBuf(options.publicKey.user.id);
 
             const credential: any = await navigator.credentials.create(options);
-            console.log(credential);
             
             const credentialPayload = {
                 id: credential.id,

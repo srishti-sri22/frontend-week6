@@ -27,9 +27,7 @@ export default function LoginPage() {
       }
 
       const startResponse = await authApi.authStart(username);
-      
-      console.log('Auth start response:', startResponse);
-      
+            
       if (!startResponse || !startResponse.publicKey) {
         throw new AppError('Invalid response from server: missing publicKey', ErrorCodes.AUTHENTICATION_ERROR);
       }
@@ -47,8 +45,6 @@ export default function LoginPage() {
         })),
         userVerification: publicKey.userVerification || 'preferred',
       };
-
-      console.log('Credential request options:', publicKeyCredentialRequestOptions);
 
       let credential: PublicKeyCredential | null = null;
       
@@ -72,8 +68,6 @@ export default function LoginPage() {
         throw new AppError('Failed to get credential', ErrorCodes.WEBAUTHN_ERROR);
       }
 
-      console.log('Credential retrieved:', credential);
-
       const assertionResponse = credential.response as AuthenticatorAssertionResponse;
       const credentialData = {
         id: credential.id,
@@ -86,13 +80,9 @@ export default function LoginPage() {
           userHandle: assertionResponse.userHandle ? bufToB64(assertionResponse.userHandle) : null,
         },
       };
-
-      console.log('Sending credential data:', credentialData);
-
-      const response = await authApi.authFinish(username, credentialData);
       
-      console.log('Authentication response:', response);
-      console.log({ response_user_id: response.user_id});
+      const response = await authApi.authFinish(username, credentialData);
+
 
       if (!response.success || !response.username) {
         throw new AppError('Authentication completed but response format unexpected', ErrorCodes.AUTHENTICATION_ERROR);
