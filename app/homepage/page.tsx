@@ -43,7 +43,7 @@ export default function Homepage() {
       } catch (error) {
         logError(error, 'Homepage - Auto Refresh');
       }
-    }, 30000);
+    }, 5000);
 
     return () => {
       if (intervalRef.current) {
@@ -236,14 +236,6 @@ export default function Homepage() {
           </>
         )}
 
-        {autoRefresh && polls.length > 0 && !pollsError && (
-          <div className="mt-8 text-center">
-            <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              Auto-refreshing every 30 seconds
-            </p>
-          </div>
-        )}
       </main>
 
       <style jsx>{`
