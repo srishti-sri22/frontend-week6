@@ -8,6 +8,7 @@ import { usePolls } from '@/hooks/usePolls';
 import { useVotes } from '@/hooks/useVotes';
 import { ChartColumn } from 'lucide-react';
 import { Poll } from '@/lib/api';
+import { getUserFriendlyMessage, logError, isAuthError, isNotFoundError, AppError, ErrorCodes } from '@/lib/errorHandler';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
@@ -27,41 +28,80 @@ export default function PollDetailPage() {
   const [isEditingVote, setIsEditingVote] = useState(false);
   const [animateOptions, setAnimateOptions] = useState(false);
   const [liveUpdates, setLiveUpdates] = useState(true);
+  const [sseError, setSseError] = useState(false);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
   
   const eventSourceRef = useRef<EventSource | null>(null);
+  const maxReconnectAttempts = 3;
 
   useEffect(() => {
     if (pollId) {
-      fetchPollById(pollId);
+      const loadPoll = async () => {
+        try {
+          await fetchPollById(pollId);
+        } catch (err) {
+          logError(err, 'PollDetailPage - Initial Load');
+        }
+      };
+      loadPoll();
     }
   }, [pollId, fetchPollById]);
 
   useEffect(() => {
     if (!pollId || !liveUpdates) return;
 
-    const eventSource = new EventSource(`${API_BASE_URL}/polls/${pollId}/stream`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onmessage = (event) => {
-      if (event.data === 'keep-alive') return;
-      
+    const connectSSE = () => {
       try {
-        const updatedPoll: Poll = JSON.parse(event.data);
-        updatePoll(pollId, updatedPoll);
+        const eventSource = new EventSource(`${API_BASE_URL}/polls/${pollId}/stream`);
+        eventSourceRef.current = eventSource;
+
+        eventSource.onmessage = (event) => {
+          if (event.data === 'keep-alive') return;
+          
+          try {
+            const updatedPoll: Poll = JSON.parse(event.data);
+            updatePoll(pollId, updatedPoll);
+            setSseError(false);
+            setReconnectAttempts(0);
+          } catch (err) {
+            logError(err, 'PollDetailPage - SSE Parse');
+            console.error('Error parsing SSE data:', err);
+          }
+        };
+
+        eventSource.onerror = (err) => {
+          logError(err, 'PollDetailPage - SSE Error');
+          console.error('SSE error:', err);
+          setSseError(true);
+          eventSource.close();
+
+          if (reconnectAttempts < maxReconnectAttempts && liveUpdates) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+            setTimeout(() => {
+              setReconnectAttempts(prev => prev + 1);
+              connectSSE();
+            }, delay);
+          }
+        };
+
+        eventSource.onopen = () => {
+          setSseError(false);
+          setReconnectAttempts(0);
+        };
       } catch (err) {
-        console.error('Error parsing SSE data:', err);
+        logError(err, 'PollDetailPage - SSE Connect');
+        setSseError(true);
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE error:', err);
-      eventSource.close();
-    };
+    connectSSE();
 
     return () => {
-      eventSource.close();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
     };
-  }, [pollId, liveUpdates, updatePoll]);
+  }, [pollId, liveUpdates, updatePoll, reconnectAttempts]);
 
   useEffect(() => {
     if (currentPoll) {
@@ -76,36 +116,52 @@ export default function PollDetailPage() {
   }, [votedOptionId, isEditingVote]);
 
   const handleVote = async () => {
-    if (!selectedOption || !userId || !isAuthenticated) {
+    if (!isAuthenticated || !userId) {
       router.push('/login');
+      return;
+    }
+
+    if (!selectedOption) {
+      setError('Please select an option');
       return;
     }
 
     try {
       setVoting(true);
+      setError('');
       await castVote(pollId, selectedOption, userId);
       setIsEditingVote(false);
       await fetchPollById(pollId);
     } catch (err: any) {
-      setError(err.message || 'Failed to vote');
+      logError(err, 'PollDetailPage - Cast Vote');
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
     } finally {
       setVoting(false);
     }
   };
 
   const handleChangeVote = async () => {
-    if (!selectedOption || !userId || !isAuthenticated) {
+    if (!isAuthenticated || !userId) {
       router.push('/login');
+      return;
+    }
+
+    if (!selectedOption) {
+      setError('Please select an option');
       return;
     }
 
     try {
       setChangingVote(true);
+      setError('');
       await changeVote(pollId, userId, selectedOption);
       setIsEditingVote(false);
       await fetchPollById(pollId);
     } catch (err: any) {
-      setError(err.message || 'Failed to change vote');
+      logError(err, 'PollDetailPage - Change Vote');
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
     } finally {
       setChangingVote(false);
     }
@@ -113,15 +169,28 @@ export default function PollDetailPage() {
 
   const handleEditVote = () => {
     setIsEditingVote(true);
+    setError('');
   };
 
   const handleCancelEdit = () => {
     setIsEditingVote(false);
     setSelectedOption(votedOptionId);
+    setError('');
   };
 
   const toggleLiveUpdates = () => {
     setLiveUpdates(!liveUpdates);
+    setSseError(false);
+    setReconnectAttempts(0);
+  };
+
+  const handleRetry = async () => {
+    try {
+      setError('');
+      await fetchPollById(pollId);
+    } catch (err) {
+      logError(err, 'PollDetailPage - Retry');
+    }
   };
 
   if (pollsLoading) {
@@ -137,18 +206,30 @@ export default function PollDetailPage() {
   }
 
   if (pollsError || !currentPoll) {
+    const errorMessage = pollsError ? getUserFriendlyMessage(pollsError) : 'Poll not found';
+    const isNotFound = isNotFoundError(pollsError);
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Navbar />
         <div className="max-w-4xl mx-auto px-4 py-16">
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-            <p className="text-red-700 text-lg">{pollsError || 'Poll not found'}</p>
-            <button
-              onClick={() => router.push('/homepage')}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Back to Homepage
-            </button>
+            <div className="text-4xl mb-4">{isNotFound ? '🔍' : '⚠️'}</div>
+            <p className="text-red-700 text-lg mb-4">{errorMessage}</p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={handleRetry}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => router.push('/homepage')}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Back to Homepage
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -186,6 +267,29 @@ export default function PollDetailPage() {
           </button>
         </div>
 
+        {sseError && liveUpdates && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-amber-800 text-sm">
+              ⚠️ Live updates temporarily unavailable. Showing last known state.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <p className="text-red-700 text-sm flex-1">{error}</p>
+              <button
+                onClick={() => setError('')}
+                className="text-red-500 hover:text-red-700"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 transition-all duration-500 hover:shadow-md">
             <div className="mb-8">
@@ -198,7 +302,6 @@ export default function PollDetailPage() {
                 </span>
               </div>
               <div className="flex gap-6 text-sm text-slate-500">
-                
                 <span className="font-medium text-slate-700">{totalVotes} votes</span>
               </div>
             </div>
@@ -264,7 +367,7 @@ export default function PollDetailPage() {
             {!hasVoted && isActive && (
               <button
                 onClick={handleVote}
-                disabled={!selectedOption || voting}
+                disabled={!selectedOption || voting || !isAuthenticated}
                 className="mt-6 w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium disabled:bg-slate-300 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow"
               >
                 {voting ? 'Submitting...' : 'Submit Vote'}
@@ -275,7 +378,7 @@ export default function PollDetailPage() {
               <div className="mt-6 flex gap-3">
                 <button
                   onClick={handleChangeVote}
-                  disabled={!selectedOption || changingVote}
+                  disabled={!selectedOption || changingVote || selectedOption === votedOptionId}
                   className="flex-1 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-600 font-medium disabled:bg-slate-300 disabled:cursor-not-allowed transition-all"
                 >
                   {changingVote ? 'Updating...' : 'Confirm Change'}
@@ -283,7 +386,7 @@ export default function PollDetailPage() {
                 <button
                   onClick={handleCancelEdit}
                   disabled={changingVote}
-                  className="px-6 py-3 bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 font-medium transition-colors"
+                  className="px-6 py-3 bg-slate-200 text-slate-700 rounded-xl hover:bg-slate-300 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
@@ -309,7 +412,7 @@ export default function PollDetailPage() {
             <div className="flex items-center gap-2 mb-6">
               <ChartColumn className="w-5 h-5 text-slate-600" />
               <h2 className="text-xl font-bold text-slate-900">Vote Distribution</h2>
-              {liveUpdates && (
+              {liveUpdates && !sseError && (
                 <span className="ml-auto text-xs text-green-600 flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                   Live

@@ -89,6 +89,7 @@ export default function PollCard({ poll }: PollCardProps) {
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <div className="text-xs text-gray-400">
+            
             {new Date(poll.created_at).toLocaleDateString('en-US', { 
               month: 'short', 
               day: 'numeric',

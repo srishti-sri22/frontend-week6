@@ -6,42 +6,91 @@ import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useStore } from '@/lib/store';
 import { usePolls } from '@/hooks/usePolls';
+import { getUserFriendlyMessage, logError, isAuthError } from '@/lib/errorHandler';
 
 export default function ManagePollsPage() {
   const router = useRouter();
   const { username, userId } = useStore();
   const { userPolls, pollsLoading, pollsError, fetchUserPolls, closePoll, resetPoll } = usePolls();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     if (userId) {
-      fetchUserPolls();
+      const loadPolls = async () => {
+        try {
+          await fetchUserPolls();
+        } catch (err) {
+          logError(err, 'ManagePollsPage - Initial Load');
+        }
+      };
+      loadPolls();
     }
   }, [userId, fetchUserPolls]);
 
   const handleClosePoll = async (pollId: string) => {
-    if (!userId || !confirm('Are you sure you want to close this poll?')) return;
+    if (!userId) {
+      setError('You must be logged in to close a poll');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to close this poll?')) return;
 
     try {
       setActionLoading(pollId);
+      setError('');
+      setSuccessMessage('');
       await closePoll(pollId, userId);
+      setSuccessMessage('Poll closed successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to close poll');
+      logError(err, 'ManagePollsPage - Close Poll');
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
+      
+      if (isAuthError(err)) {
+        setTimeout(() => router.push('/login'), 2000);
+      }
     } finally {
       setActionLoading(null);
     }
   };
   
   const handleResetPoll = async (pollId: string) => {
-    if (!userId || !confirm('Are you sure you want to reset this poll? All votes will be removed.')) return;
+    if (!userId) {
+      setError('You must be logged in to reset a poll');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to reset this poll? All votes will be removed.')) return;
 
     try {
       setActionLoading(pollId);
+      setError('');
+      setSuccessMessage('');
       await resetPoll(pollId, userId);
+      setSuccessMessage('Poll reset successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to reset poll');
+      logError(err, 'ManagePollsPage - Reset Poll');
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
+      
+      if (isAuthError(err)) {
+        setTimeout(() => router.push('/login'), 2000);
+      }
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleRetry = async () => {
+    try {
+      setError('');
+      await fetchUserPolls();
+    } catch (err) {
+      logError(err, 'ManagePollsPage - Retry');
     }
   };
 
@@ -79,7 +128,31 @@ export default function ManagePollsPage() {
             </button>
           </div>
 
-          {pollsLoading && (
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-50/80 backdrop-blur-sm border-2 border-green-200 rounded-xl animate-fadeInUp">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">✓</span>
+                <p className="text-green-700 font-medium text-sm flex-1">{successMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm border-2 border-red-200 rounded-xl animate-fadeInUp">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">⚠️</span>
+                <p className="text-red-700 font-medium text-sm flex-1">{error}</p>
+                <button
+                  onClick={() => setError('')}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          {pollsLoading && userPolls.length === 0 && (
             <div className="text-center py-16 sm:py-20 animate-fadeIn">
               <div className="relative">
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
@@ -95,12 +168,13 @@ export default function ManagePollsPage() {
                 <div className="text-3xl">⚠️</div>
                 <div className="flex-1">
                   <p className="text-red-700 font-semibold text-lg mb-2">Oops! Something went wrong</p>
-                  <p className="text-red-600 mb-4">{pollsError}</p>
+                  <p className="text-red-600 mb-4">{getUserFriendlyMessage(pollsError)}</p>
                   <button
-                    onClick={() => fetchUserPolls()}
-                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+                    onClick={handleRetry}
+                    disabled={pollsLoading}
+                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   >
-                    Try Again
+                    {pollsLoading ? 'Retrying...' : 'Try Again'}
                   </button>
                 </div>
               </div>
@@ -191,7 +265,7 @@ export default function ManagePollsPage() {
                             <button
                               onClick={() => handleClosePoll(poll.id)}
                               disabled={isLoading}
-                              className="px-5 py-2.5 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 font-semibold disabled:opacity-50 transition-all duration-300 border border-yellow-200 hover:border-yellow-300"
+                              className="px-5 py-2.5 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 border border-yellow-200 hover:border-yellow-300"
                             >
                               {isLoading ? 'Closing...' : 'Close Poll'}
                             </button>
@@ -200,7 +274,7 @@ export default function ManagePollsPage() {
                           <button
                             onClick={() => handleResetPoll(poll.id)}
                             disabled={isLoading}
-                            className="px-5 py-2.5 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 font-semibold disabled:opacity-50 transition-all duration-300 border border-red-200 hover:border-red-300"
+                            className="px-5 py-2.5 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 border border-red-200 hover:border-red-300"
                           >
                             {isLoading ? 'Resetting...' : 'Reset Poll'}
                           </button>

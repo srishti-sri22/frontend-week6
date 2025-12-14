@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import { authApi } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { b64ToBuf, bufToB64 } from '@/lib/webauthn';
+import { getUserFriendlyMessage, logError, isAuthError, AppError, ErrorCodes } from '@/lib/errorHandler';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,12 +22,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      if (!username.trim()) {
+        throw new AppError('Username is required', ErrorCodes.VALIDATION_ERROR);
+      }
+
       const startResponse = await authApi.authStart(username);
       
       console.log('Auth start response:', startResponse);
       
       if (!startResponse || !startResponse.publicKey) {
-        throw new Error('Invalid response from server: missing publicKey');
+        throw new AppError('Invalid response from server: missing publicKey', ErrorCodes.AUTHENTICATION_ERROR);
       }
 
       const { publicKey } = startResponse;
@@ -45,12 +50,26 @@ export default function LoginPage() {
 
       console.log('Credential request options:', publicKeyCredentialRequestOptions);
 
-      const credential = await navigator.credentials.get({
-        publicKey: publicKeyCredentialRequestOptions,
-      }) as PublicKeyCredential;
+      let credential: PublicKeyCredential | null = null;
+      
+      try {
+        credential = await navigator.credentials.get({
+          publicKey: publicKeyCredentialRequestOptions,
+        }) as PublicKeyCredential;
+      } catch (credError: any) {
+        logError(credError, 'LoginPage - Credential Get');
+        
+        if (credError.name === 'NotAllowedError') {
+          throw new AppError('Passkey authentication was cancelled', ErrorCodes.WEBAUTHN_ERROR);
+        } else if (credError.name === 'InvalidStateError') {
+          throw new AppError('No passkey found for this account', ErrorCodes.WEBAUTHN_ERROR);
+        } else {
+          throw new AppError('Failed to retrieve passkey. Please try again.', ErrorCodes.WEBAUTHN_ERROR);
+        }
+      }
 
       if (!credential) {
-        throw new Error('Failed to get credential');
+        throw new AppError('Failed to get credential', ErrorCodes.WEBAUTHN_ERROR);
       }
 
       console.log('Credential retrieved:', credential);
@@ -75,22 +94,32 @@ export default function LoginPage() {
       console.log('Authentication response:', response);
       console.log({ response_user_id: response.user_id});
 
-      if (response.success && response.username) {
-        setUser(response.username, response.user_id, response.display_name);
-        
-        if (typeof window !== 'undefined') {
+      if (!response.success || !response.username) {
+        throw new AppError('Authentication completed but response format unexpected', ErrorCodes.AUTHENTICATION_ERROR);
+      }
+
+      setUser(response.username, response.user_id, response.display_name);
+      
+      if (typeof window !== 'undefined') {
+        try {
           localStorage.setItem('username', response.username);
           localStorage.setItem('user_id', response.user_id);
           localStorage.setItem('display_name', response.display_name);
+        } catch (storageError) {
+          logError(storageError, 'LoginPage - LocalStorage');
         }
-        
-        router.push('/homepage');
-      } else {
-        throw new Error('Authentication completed but response format unexpected');
       }
+      
+      router.push('/homepage');
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Login failed. Please try again.');
+      logError(err, 'LoginPage - Login');
+      
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
+      
+      if (isAuthError(err)) {
+        console.error('Authentication failed:', errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -136,6 +165,7 @@ export default function LoginPage() {
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-700 placeholder-gray-400"
                 placeholder="Enter your username"
                 required
+                disabled={loading}
               />
             </div>
 

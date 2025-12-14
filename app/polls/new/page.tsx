@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useStore } from '@/lib/store';
 import { usePolls } from '@/hooks/usePolls';
+import { getUserFriendlyMessage, logError, isAuthError, isValidationError, AppError, ErrorCodes } from '@/lib/errorHandler';
 
 export default function CreatePollPage() {
   const router = useRouter();
@@ -18,12 +19,18 @@ export default function CreatePollPage() {
   const [error, setError] = useState('');
 
   const handleAddOption = () => {
+    if (options.length >= 10) {
+      setError('Maximum 10 options allowed');
+      return;
+    }
     setOptions([...options, '']);
+    setError('');
   };
 
   const handleRemoveOption = (index: number) => {
     if (options.length > 2) {
       setOptions(options.filter((_, i) => i !== index));
+      setError('');
     }
   };
 
@@ -31,37 +38,93 @@ export default function CreatePollPage() {
     const newOptions = [...options];
     newOptions[index] = value;
     setOptions(newOptions);
+    setError('');
+  };
+
+  const validateForm = (): boolean => {
+    if (!title.trim()) {
+      setError('Poll question is required');
+      return false;
+    }
+
+    if (title.trim().length < 5) {
+      setError('Poll question must be at least 5 characters long');
+      return false;
+    }
+
+    if (title.trim().length > 200) {
+      setError('Poll question must not exceed 200 characters');
+      return false;
+    }
+
+    const validOptions = options.filter(opt => opt.trim() !== '');
+    
+    if (validOptions.length < 2) {
+      setError('At least 2 options are required');
+      return false;
+    }
+
+    const uniqueOptions = new Set(validOptions.map(opt => opt.trim().toLowerCase()));
+    if (uniqueOptions.size !== validOptions.length) {
+      setError('All options must be unique');
+      return false;
+    }
+
+    for (const option of validOptions) {
+      if (option.trim().length < 1) {
+        setError('Options cannot be empty');
+        return false;
+      }
+      if (option.trim().length > 100) {
+        setError('Options must not exceed 100 characters');
+        return false;
+      }
+    }
+
+    if (!userId) {
+      setError('You must be logged in to create a poll');
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!title.trim() ) {
-      setError('Title is required');
+    if (!validateForm()) {
       return;
     }
 
     const validOptions = options.filter(opt => opt.trim() !== '');
-    if (validOptions.length < 2) {
-      setError('At least 2 options are required');
-      return;
-    }
-
-    if (!userId) {
-      setError('User not authenticated');
-      return;
-    }
 
     try {
       setLoading(true);
-      const newPoll = await createPoll(title.trim(), validOptions, userId);
+      const newPoll = await createPoll(title.trim(), validOptions, userId!);
+      
+      if (!newPoll || !newPoll.id) {
+        throw new AppError('Poll created but no ID returned', ErrorCodes.INTERNAL_ERROR);
+      }
+
       router.push(`/polls/${newPoll.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create poll');
+      logError(err, 'CreatePollPage - Submit');
+      const errorMessage = getUserFriendlyMessage(err);
+      setError(errorMessage);
+
+      if (isAuthError(err)) {
+        setTimeout(() => router.push('/login'), 2000);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClearForm = () => {
+    setTitle('');
+    setOptions(['', '']);
+    setError('');
   };
 
   return (
@@ -89,7 +152,15 @@ export default function CreatePollPage() {
             <div className="mb-6 p-4 bg-red-50/80 backdrop-blur-sm border-2 border-red-200 rounded-xl animate-shake">
               <div className="flex items-start gap-3">
                 <span className="text-xl">⚠️</span>
-                <p className="text-red-700 font-medium flex-1">{error}</p>
+                <div className="flex-1">
+                  <p className="text-red-700 font-medium">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError('')}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  ✕
+                </button>
               </div>
             </div>
           )}
@@ -108,7 +179,12 @@ export default function CreatePollPage() {
                 className="w-full px-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400"
                 placeholder="What would you like to ask?"
                 required
+                disabled={loading}
+                maxLength={200}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                {title.length}/200 characters
+              </p>
             </div>
 
             <div>
@@ -134,13 +210,16 @@ export default function CreatePollPage() {
                         className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 text-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder-gray-400"
                         placeholder={`Option ${index + 1}`}
                         required
+                        disabled={loading}
+                        maxLength={100}
                       />
                     </div>
                     {options.length > 2 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveOption(index)}
-                        className="px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-semibold transition-all duration-300 border border-red-200 hover:border-red-300"
+                        disabled={loading}
+                        className="px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-semibold transition-all duration-300 border border-red-200 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         ✕
                       </button>
@@ -151,9 +230,10 @@ export default function CreatePollPage() {
               <button
                 type="button"
                 onClick={handleAddOption}
-                className="mt-4 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 font-semibold transition-all duration-300 border border-blue-200 hover:border-blue-300"
+                disabled={loading || options.length >= 10}
+                className="mt-4 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 font-semibold transition-all duration-300 border border-blue-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Add Another Option
+                + Add Another Option {options.length >= 10 && '(Max reached)'}
               </button>
             </div>
 
@@ -168,11 +248,9 @@ export default function CreatePollPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all duration-300"
-                  onClick={()=>{
-                    setTitle("");
-                    setOptions(['', '']);
-                  }}
+                  className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleClearForm}
+                  disabled={loading}
                 >
                   Clear Form
                 </button>

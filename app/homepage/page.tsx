@@ -5,16 +5,27 @@ import Navbar from '@/components/Navbar';
 import PollCard from '@/components/PollCard';
 import { useStore } from '@/lib/store';
 import { usePolls } from '@/hooks/usePolls';
+import { getUserFriendlyMessage, logError } from '@/lib/errorHandler';
 
 export default function Homepage() {
   const { username } = useStore();
   const { polls, pollsLoading, pollsError, fetchAllPolls } = usePolls();
   const [filter, setFilter] = useState<'all' | 'active' | 'closed'>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    fetchAllPolls();
+    const loadPolls = async () => {
+      try {
+        await fetchAllPolls();
+        setRetryCount(0);
+      } catch (error) {
+        logError(error, 'Homepage - Initial Load');
+      }
+    };
+    
+    loadPolls();
   }, [fetchAllPolls]);
 
   useEffect(() => {
@@ -26,8 +37,12 @@ export default function Homepage() {
       return;
     }
 
-    intervalRef.current = setInterval(() => {
-      fetchAllPolls();
+    intervalRef.current = setInterval(async () => {
+      try {
+        await fetchAllPolls();
+      } catch (error) {
+        logError(error, 'Homepage - Auto Refresh');
+      }
     }, 30000);
 
     return () => {
@@ -49,6 +64,17 @@ export default function Homepage() {
   const toggleAutoRefresh = () => {
     setAutoRefresh(!autoRefresh);
   };
+
+  const handleRetry = async () => {
+    try {
+      setRetryCount(prev => prev + 1);
+      await fetchAllPolls();
+    } catch (error) {
+      logError(error, 'Homepage - Manual Retry');
+    }
+  };
+
+  const errorMessage = pollsError ? getUserFriendlyMessage(pollsError) : '';
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -150,13 +176,21 @@ export default function Homepage() {
               <div className="text-3xl">⚠️</div>
               <div className="flex-1">
                 <p className="text-red-700 font-semibold text-lg mb-2">Oops! Something went wrong</p>
-                <p className="text-red-600 mb-4">{pollsError}</p>
-                <button
-                  onClick={fetchAllPolls}
-                  className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
-                >
-                  Try Again
-                </button>
+                <p className="text-red-600 mb-4">{errorMessage}</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleRetry}
+                    disabled={pollsLoading}
+                    className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  >
+                    {pollsLoading ? 'Retrying...' : 'Try Again'}
+                  </button>
+                  {retryCount > 0 && (
+                    <span className="text-sm text-gray-600">
+                      Attempt {retryCount + 1}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -202,7 +236,7 @@ export default function Homepage() {
           </>
         )}
 
-        {autoRefresh && polls.length > 0 && (
+        {autoRefresh && polls.length > 0 && !pollsError && (
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>

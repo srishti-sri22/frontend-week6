@@ -7,6 +7,13 @@ import Navbar from '@/components/Navbar';
 import { authApi } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { b64ToBuf, bufToB64 } from '@/lib/webauthn';
+import { 
+    AppError, 
+    ErrorCodes, 
+    getUserFriendlyMessage, 
+    logError,
+    isConflictError 
+} from '@/lib/errorHandler';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -22,16 +29,21 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
+          
             const startResponse = await authApi.registerStart(username, displayName);
             
             if (!startResponse) {
-                throw new Error('Registration failed');
+                throw new AppError(
+                    'Failed to initialize registration',
+                    ErrorCodes.WEBAUTHN_ERROR
+                );
             }
 
-            console.log('Start response:', startResponse);
-
-            if (!startResponse || !startResponse.publicKey) {
-                throw new Error('Invalid response from server: missing publicKey');
+            if (!startResponse.publicKey) {
+                throw new AppError(
+                    'Invalid server response: missing passkey configuration',
+                    ErrorCodes.VALIDATION_ERROR
+                );
             }
 
             const { publicKey } = startResponse;
@@ -53,17 +65,27 @@ export default function RegisterPage() {
                 authenticatorSelection: publicKey.authenticatorSelection,
             };
 
-            console.log('Credential creation options:', publicKeyCredentialCreationOptions);
-
-            const credential = await navigator.credentials.create({
-                publicKey: publicKeyCredentialCreationOptions,
-            }) as PublicKeyCredential;
-
-            if (!credential) {
-                throw new Error('Failed to create credential');
+            let credential: PublicKeyCredential;
+            try {
+                credential = await navigator.credentials.create({
+                    publicKey: publicKeyCredentialCreationOptions,
+                }) as PublicKeyCredential;
+            } catch (webauthnError) {
+                logError(webauthnError, 'WebAuthn credential creation');
+                throw new AppError(
+                    'Passkey creation was cancelled or failed. Please try again.',
+                    ErrorCodes.WEBAUTHN_ERROR,
+                    undefined,
+                    webauthnError instanceof Error ? webauthnError.message : undefined
+                );
             }
 
-            console.log('Credential created:', credential);
+            if (!credential) {
+                throw new AppError(
+                    'Failed to create passkey credential',
+                    ErrorCodes.WEBAUTHN_ERROR
+                );
+            }
 
             const attestationResponse = credential.response as AuthenticatorAttestationResponse;
             const credentialData = {
@@ -76,38 +98,45 @@ export default function RegisterPage() {
                 },
             };
 
-            console.log('Sending credential data:', credentialData);
-
             const response = await authApi.registerFinish(username, credentialData);
-
-            console.log('Registration response:', response);
-            console.log({uid: response.user_id});
             
-            if (response.success && response.username) {
-                setUser(response.username, response.user_id, response.display_name);
-                
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('username', response.username);
-                    localStorage.setItem('user_id', response.user_id);
-                    localStorage.setItem('display_name', response.display_name);
-                }
-
-                router.push('/login');
-            } else {
-                throw new Error('Registration completed but response format unexpected');
+            if (!response.success || !response.username) {
+                throw new AppError(
+                    'Registration completed but server response was invalid',
+                    ErrorCodes.VALIDATION_ERROR
+                );
             }
-        } catch (err: any) {
-            console.error('Registration error:', err);
+
+            setUser(response.username, response.user_id, response.display_name);
             
-            if (err.message === 'USERNAME_EXISTS') {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('username', response.username);
+                localStorage.setItem('user_id', response.user_id);
+                localStorage.setItem('display_name', response.display_name);
+            }
+
+            router.push('/login');
+
+        } catch (err: unknown) {
+            logError(err, 'Registration');
+
+            if (isConflictError(err)) {
                 setError('Username already exists. Redirecting to login...');
                 setTimeout(() => {
                     router.push('/login');
                 }, 2000);
                 return;
             }
-            
-            setError(err.message || 'Registration failed. Please try again.');
+
+            if (err instanceof Error && err.message === 'USERNAME_EXISTS') {
+                setError('Username already exists. Redirecting to login...');
+                setTimeout(() => {
+                    router.push('/login');
+                }, 2000);
+                return;
+            }
+
+            setError(getUserFriendlyMessage(err));
         } finally {
             setLoading(false);
         }
