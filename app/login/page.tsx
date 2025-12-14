@@ -76,11 +76,12 @@ export default function LoginPage() {
       console.log({ response_user_id: response.user_id});
 
       if (response.success && response.username) {
-        setUser(response.username, response.user_id);
+        setUser(response.username, response.user_id, response.display_name);
         
         if (typeof window !== 'undefined') {
           localStorage.setItem('username', response.username);
           localStorage.setItem('user_id', response.user_id);
+          localStorage.setItem('display_name', response.display_name);
         }
         
         router.push('/homepage');

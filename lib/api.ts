@@ -21,12 +21,12 @@ export interface PollOption {
 }
 
 export const authApi = {
-  registerStart: async (username: string) => {
+   registerStart: async (username: string, displayName: string) => {
     const res = await fetch(`${API_BASE_URL}/auth/register/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ username })
+      body: JSON.stringify({ username, display_name: displayName })
     });
     if (!res.ok) {
       const errorText = await res.text();
@@ -35,7 +35,6 @@ export const authApi = {
     }
     return res.json();
   },
-
   registerFinish: async (username: string, credential: any) => {
     const res = await fetch(`${API_BASE_URL}/auth/register/finish`, {
       method: 'POST',

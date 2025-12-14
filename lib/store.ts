@@ -5,6 +5,7 @@ import { Poll } from './api';
 interface UserState {
   username: string | null;
   userId: string | null;
+  displayName: string | null;
   isAuthenticated: boolean;
 }
 
@@ -21,7 +22,7 @@ interface VoteState {
 }
 
 interface AppState extends UserState, PollState, VoteState {
-  setUser: (username: string | null, userId: string | null) => void;
+  setUser: (username: string | null, userId: string | null, displayName?: string | null) => void;
   clearUser: () => void;
   setPolls: (polls: Poll[]) => void;
   setUserPolls: (polls: Poll[]) => void;
@@ -40,6 +41,7 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       username: null,
       userId: null,
+      displayName: null,
       isAuthenticated: false,
       polls: [],
       userPolls: [],
@@ -48,10 +50,11 @@ export const useStore = create<AppState>()(
       pollsError: null,
       userVotes: {},
 
-      setUser: (username, userId) =>
+      setUser: (username, userId, displayName = null) =>
         set({
           username,
           userId,
+          displayName,
           isAuthenticated: !!(username && userId),
         }),
 
@@ -59,6 +62,7 @@ export const useStore = create<AppState>()(
         set({
           username: null,
           userId: null,
+          displayName: null,
           isAuthenticated: false,
           userPolls: [],
           userVotes: {},
@@ -109,6 +113,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         username: state.username,
         userId: state.userId,
+        displayName: state.displayName,
         isAuthenticated: state.isAuthenticated,
         userVotes: state.userVotes,
       }),

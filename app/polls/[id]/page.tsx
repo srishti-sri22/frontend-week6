@@ -198,10 +198,7 @@ export default function PollDetailPage() {
                 </span>
               </div>
               <div className="flex gap-6 text-sm text-slate-500">
-                {/* <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>👤</span>
-            <span>by <span className="font-semibold text-gray-700">{poll.creator_id}</span></span>
-          </div> */}
+                
                 <span className="font-medium text-slate-700">{totalVotes} votes</span>
               </div>
             </div>

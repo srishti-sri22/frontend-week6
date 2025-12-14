@@ -6,9 +6,14 @@ export const usePasskeyRegister = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const register = async (username: string) => {
+    const register = async (username: string, displayName: string) => {
         if (!username) {
             setError('Username is required');
+            return null;
+        }
+
+        if (!displayName) {
+            setError('Display name is required');
             return null;
         }
 
@@ -16,7 +21,7 @@ export const usePasskeyRegister = () => {
         setError(null);
 
         try {
-            const options = await authApi.registerStart(username);
+            const options = await authApi.registerStart(username, displayName);
 
             options.publicKey.challenge = b64ToBuf(options.publicKey.challenge);
             options.publicKey.user.id = b64ToBuf(options.publicKey.user.id);

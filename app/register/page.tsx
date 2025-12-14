@@ -12,6 +12,7 @@ export default function RegisterPage() {
     const router = useRouter();
     const setUser = useStore((state) => state.setUser);
     const [username, setUsername] = useState('');
+    const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -21,7 +22,7 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-            const startResponse = await authApi.registerStart(username);
+            const startResponse = await authApi.registerStart(username, displayName);
 
             console.log('Start response:', startResponse);
 
@@ -79,11 +80,12 @@ export default function RegisterPage() {
             console.log({uid: response.user_id});
             
             if (response.success && response.username) {
-                setUser(response.username, response.user_id);
+                setUser(response.username, response.user_id, response.display_name);
                 
                 if (typeof window !== 'undefined') {
                     localStorage.setItem('username', response.username);
                     localStorage.setItem('user_id', response.user_id);
+                    localStorage.setItem('display_name', response.display_name);
                 }
 
                 router.push('/login');
@@ -136,11 +138,28 @@ export default function RegisterPage() {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-700 placeholder-gray-400"
-                                placeholder="Choose a username"
+                                placeholder="Choose a unique username"
                                 required
                                 minLength={3}
                             />
-                            <p className="mt-2 text-xs text-gray-500">Must be at least 3 characters long</p>
+                            <p className="mt-2 text-xs text-gray-500">Must be unique and at least 3 characters</p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="displayName" className="block text-sm font-semibold text-gray-700 mb-2">
+                                Display Name
+                            </label>
+                            <input
+                                type="text"
+                                id="displayName"
+                                value={displayName}
+                                onChange={(e) => setDisplayName(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-700 placeholder-gray-400"
+                                placeholder="Your display name"
+                                required
+                                minLength={2}
+                            />
+                            <p className="mt-2 text-xs text-gray-500">This is how others will see you</p>
                         </div>
 
                         <button
