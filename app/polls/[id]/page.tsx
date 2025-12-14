@@ -139,6 +139,7 @@ export default function PollDetailPage() {
     try {
       setVoting(true);
       setError('');
+      setIsEditingVote(true);
       await castVote(pollId, selectedOption, userId);
       setIsEditingVote(false);
       await fetchPollById(pollId);
