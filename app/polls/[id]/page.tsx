@@ -16,11 +16,11 @@ export default function PollDetailPage() {
   const router = useRouter();
   const params = useParams();
   const pollId = params.id as string;
-  
+
   const { username, userId, isAuthenticated, updatePoll } = useStore();
   const { currentPoll, pollsLoading, pollsError, fetchPollById } = usePolls();
   const { hasVoted, votedOptionId, castVote, changeVote } = useVotes(pollId);
-  
+
   const [voting, setVoting] = useState(false);
   const [changingVote, setChangingVote] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +30,7 @@ export default function PollDetailPage() {
   const [liveUpdates, setLiveUpdates] = useState(true);
   const [sseError, setSseError] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  
+
   const eventSourceRef = useRef<EventSource | null>(null);
   const maxReconnectAttempts = 3;
 
@@ -57,7 +57,9 @@ export default function PollDetailPage() {
 
         eventSource.onmessage = (event) => {
           if (event.data === 'keep-alive') return;
-          
+
+          if (isEditingVote) return; // skip updates while user is voting/changing vote
+
           try {
             const updatedPoll: Poll = JSON.parse(event.data);
             updatePoll(pollId, updatedPoll);
@@ -65,9 +67,9 @@ export default function PollDetailPage() {
             setReconnectAttempts(0);
           } catch (err) {
             logError(err, 'PollDetailPage - SSE Parse');
-            console.error('Error parsing SSE data:', err);
           }
         };
+
 
         eventSource.onerror = (err) => {
           logError(err, 'PollDetailPage - SSE Error');
@@ -109,12 +111,12 @@ export default function PollDetailPage() {
     }
   }, [currentPoll]);
   useEffect(() => {
-  if (currentPoll && currentPoll.total_votes === 0) {
-    useStore.getState().clearUserVote(pollId);
-    setSelectedOption(null);
-    setIsEditingVote(false);
-  }
-}, [currentPoll, pollId]);
+    if (currentPoll && currentPoll.total_votes === 0) {
+      useStore.getState().clearUserVote(pollId);
+      setSelectedOption(null);
+      setIsEditingVote(false);
+    }
+  }, [currentPoll, pollId]);
 
 
   useEffect(() => {
@@ -252,7 +254,7 @@ export default function PollDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Navbar />
-      
+
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
           <button
@@ -261,14 +263,13 @@ export default function PollDetailPage() {
           >
             <span>←</span> Back
           </button>
-          
+
           <button
             onClick={toggleLiveUpdates}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-              liveUpdates 
-                ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${liveUpdates
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
+              }`}
           >
             <span className={`w-2 h-2 rounded-full ${liveUpdates ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`}></span>
             {liveUpdates ? 'Live Updates On' : 'Live Updates Off'}
@@ -303,9 +304,8 @@ export default function PollDetailPage() {
             <div className="mb-8">
               <div className="flex justify-between items-start gap-4 mb-4">
                 <h1 className="text-3xl font-bold text-slate-900">{poll.question}</h1>
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                  isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
                   {isActive ? '● Active' : '● Closed'}
                 </span>
               </div>
@@ -334,8 +334,8 @@ export default function PollDetailPage() {
                 const isSelected = selectedOption === option.id;
 
                 return (
-                  <div 
-                    key={option.id} 
+                  <div
+                    key={option.id}
                     className="relative"
                     style={{
                       animation: animateOptions ? `slideIn 0.4s ease-out ${index * 0.1}s both` : 'none'
@@ -344,11 +344,10 @@ export default function PollDetailPage() {
                     <button
                       onClick={() => (!hasVoted || isEditingVote) && isActive && setSelectedOption(option.id)}
                       disabled={(hasVoted && !isEditingVote) || !isActive}
-                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                        isSelected
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${isSelected
                           ? 'border-blue-500 bg-blue-50 shadow-sm'
                           : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                      } ${((hasVoted && !isEditingVote) || !isActive) ? 'cursor-default' : 'cursor-pointer'}`}
+                        } ${((hasVoted && !isEditingVote) || !isActive) ? 'cursor-default' : 'cursor-pointer'}`}
                     >
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-medium text-slate-900">{option.text}</span>
@@ -359,7 +358,7 @@ export default function PollDetailPage() {
                       <div className="text-xs text-slate-500 mb-2">
                         {option.votes} {option.votes === 1 ? 'vote' : 'votes'}
                       </div>
-                      
+
                       <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                         <div
                           className="bg-blue-500 h-1.5 rounded-full transition-all duration-700 ease-out"
@@ -427,7 +426,7 @@ export default function PollDetailPage() {
                 </span>
               )}
             </div>
-            
+
             <div className="relative" style={{ height: '320px' }}>
               <div className="absolute left-0 top-0 w-12 flex flex-col justify-between text-xs text-slate-500 text-right pr-2" style={{ height: '280px' }}>
                 <span>{maxVotes}</span>
@@ -436,21 +435,21 @@ export default function PollDetailPage() {
                 <span>{Math.floor(maxVotes * 0.25)}</span>
                 <span>0</span>
               </div>
-              
+
               <div className="absolute left-14 right-0 top-0 flex flex-col justify-between" style={{ height: '280px' }}>
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div key={i} className="border-t border-slate-200"></div>
                 ))}
               </div>
-              
+
               <div className="absolute left-14 right-0 top-0 flex items-end justify-around gap-4 px-4" style={{ height: '280px' }}>
                 {poll.options.map((option, index) => {
                   const votePercentage = totalVotes > 0 ? (option.votes / totalVotes) * 100 : 0;
                   const barHeight = maxVotes > 0 ? ((option.votes / maxVotes) * 100) : 0;
-                  
+
                   return (
-                    <div 
-                      key={option.id} 
+                    <div
+                      key={option.id}
                       className="flex flex-col items-center justify-end"
                       style={{
                         width: `${100 / poll.options.length - 2}%`,
@@ -462,10 +461,10 @@ export default function PollDetailPage() {
                       <div className="mb-1 text-sm font-bold text-slate-700" style={{ minHeight: '20px' }}>
                         {option.votes > 0 ? option.votes : ''}
                       </div>
-                      
-                      <div 
+
+                      <div
                         className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg relative group cursor-pointer hover:from-blue-700 hover:to-blue-500 transition-all duration-300"
-                        style={{ 
+                        style={{
                           height: `${barHeight}%`,
                           minHeight: option.votes > 0 ? '12px' : '0px'
                         }}
@@ -479,11 +478,11 @@ export default function PollDetailPage() {
                   );
                 })}
               </div>
-              
+
               <div className="absolute left-14 right-0 flex justify-around gap-4 px-4 pt-2 border-t border-slate-300" style={{ top: '280px', height: '40px' }}>
                 {poll.options.map((option, index) => (
-                  <div 
-                    key={option.id} 
+                  <div
+                    key={option.id}
                     className="text-center text-xs text-slate-600 font-medium truncate"
                     style={{
                       width: `${100 / poll.options.length - 2}%`,
@@ -497,7 +496,7 @@ export default function PollDetailPage() {
                 ))}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-200">
               <div className="text-center">
                 <div className="text-2xl font-bold text-slate-900">{totalVotes}</div>
