@@ -26,33 +26,33 @@ export default function Navbar() {
     
     try {
       await authApi.logout();
-
+      
       clearUser();
-
+      
       if (typeof window !== 'undefined') {
         localStorage.removeItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('display_name');
       }
-
+      
       router.push('/login');
       
     } catch (error: unknown) {
       logError(error, 'Navbar logout');
-
+      
       clearUser();
       if (typeof window !== 'undefined') {
         localStorage.removeItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('display_name');
       }
-
+      
       if (isAuthError(error)) {
         router.push('/login');
       } else {
         const errorMessage = getUserFriendlyMessage(error);
         setLogoutError(errorMessage);
-
+        
         setTimeout(() => {
           router.push('/login');
         }, 2000);
@@ -246,25 +246,8 @@ export default function Navbar() {
             </div>
           )}
         </div>
-
-        <style jsx>{`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-              transform: translateY(-10px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.2s ease-out;
-          }
-        `}</style>
       </nav>
 
-      {/* Error toast for logout errors */}
       {logoutError && (
         <div className="fixed top-20 right-4 z-50 animate-slideIn">
           <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 shadow-xl max-w-md">
@@ -288,6 +271,20 @@ export default function Navbar() {
       )}
 
       <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+        
         @keyframes slideIn {
           from {
             opacity: 0;
