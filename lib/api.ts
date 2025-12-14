@@ -29,9 +29,12 @@ export const authApi = {
       body: JSON.stringify({ username, display_name: displayName })
     });
     if (!res.ok) {
+      if (res.status === 409) {
+        throw new Error('USERNAME_EXISTS');
+      }
       const errorText = await res.text();
       console.error('Registration start error:', errorText);
-      throw new Error(errorText || 'Registration start failed');
+      throw new Error(errorText || 'Username Already Exists...');
     }
     return res.json();
   },

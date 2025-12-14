@@ -23,6 +23,10 @@ export default function RegisterPage() {
 
         try {
             const startResponse = await authApi.registerStart(username, displayName);
+            
+            if (!startResponse) {
+                throw new Error('Registration failed');
+            }
 
             console.log('Start response:', startResponse);
 
@@ -94,6 +98,15 @@ export default function RegisterPage() {
             }
         } catch (err: any) {
             console.error('Registration error:', err);
+            
+            if (err.message === 'USERNAME_EXISTS') {
+                setError('Username already exists. Redirecting to login...');
+                setTimeout(() => {
+                    router.push('/login');
+                }, 2000);
+                return;
+            }
+            
             setError(err.message || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
