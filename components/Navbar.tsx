@@ -72,7 +72,8 @@ export default function Navbar() {
                 href="/" 
                 className="text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors duration-200 hover:scale-105 transform"
               >
-                Polling Poller Polled
+                
+                Poll-Sphere
               </Link>
             </div>
 
