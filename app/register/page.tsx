@@ -7,12 +7,12 @@ import Navbar from '@/components/Navbar';
 import { authApi } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { b64ToBuf, bufToB64 } from '@/lib/webauthn';
-import { 
-    AppError, 
-    ErrorCodes, 
-    getUserFriendlyMessage, 
+import {
+    AppError,
+    ErrorCodes,
+    getUserFriendlyMessage,
     logError,
-    isConflictError 
+    isConflictError
 } from '@/lib/errorHandler';
 
 export default function RegisterPage() {
@@ -29,9 +29,13 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
-          
+
+            if (!username.trim()) {
+                throw new AppError('Username is required', ErrorCodes.VALIDATION_ERROR);
+            }
+
             const startResponse = await authApi.registerStart(username, displayName);
-            
+
             if (!startResponse) {
                 throw new AppError(
                     'Failed to initialize registration',
@@ -99,7 +103,7 @@ export default function RegisterPage() {
             };
 
             const response = await authApi.registerFinish(username, credentialData);
-            
+
             if (!response.success || !response.username) {
                 throw new AppError(
                     'Registration completed but server response was invalid',
@@ -108,7 +112,7 @@ export default function RegisterPage() {
             }
 
             setUser(response.username, response.user_id, response.display_name);
-            
+
             if (typeof window !== 'undefined') {
                 localStorage.setItem('username', response.username);
                 localStorage.setItem('user_id', response.user_id);
@@ -145,7 +149,7 @@ export default function RegisterPage() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden">
             <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-            
+
             <Navbar />
 
             <main className="relative max-w-md mx-auto px-4 py-12 sm:py-20">
