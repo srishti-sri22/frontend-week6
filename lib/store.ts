@@ -7,6 +7,8 @@ interface UserState {
   userId: string | null;
   displayName: string | null;
   isAuthenticated: boolean;
+  isLoggedIn: boolean;
+  registeredUsername: string | null; // Store username after registration for auto-fill on login
 }
 
 interface PollState {
@@ -23,6 +25,8 @@ interface VoteState {
 
 interface AppState extends UserState, PollState, VoteState {
   setUser: (username: string | null, userId: string | null, displayName?: string | null) => void;
+  setLoggedIn: (isLoggedIn: boolean) => void;
+  setRegisteredUsername: (username: string | null) => void;
   clearUser: () => void;
   setPolls: (polls: Poll[]) => void;
   setUserPolls: (polls: Poll[]) => void;
@@ -44,6 +48,8 @@ export const useStore = create<AppState>()(
       userId: null,
       displayName: null,
       isAuthenticated: false,
+      isLoggedIn: false,
+      registeredUsername: null,
       polls: [],
       userPolls: [],
       currentPoll: null,
@@ -59,12 +65,20 @@ export const useStore = create<AppState>()(
           isAuthenticated: !!(username && userId),
         }),
 
+      setLoggedIn: (isLoggedIn) =>
+        set({ isLoggedIn }),
+
+      setRegisteredUsername: (username) =>
+        set({ registeredUsername: username }),
+
       clearUser: () =>
         set({
           username: null,
           userId: null,
           displayName: null,
           isAuthenticated: false,
+          isLoggedIn: false,
+          registeredUsername: null,
           userPolls: [],
           userVotes: {},
         }),
@@ -123,6 +137,8 @@ export const useStore = create<AppState>()(
         userId: state.userId,
         displayName: state.displayName,
         isAuthenticated: state.isAuthenticated,
+        isLoggedIn: state.isLoggedIn,
+        registeredUsername: state.registeredUsername,
         userVotes: state.userVotes,
       }),
     }

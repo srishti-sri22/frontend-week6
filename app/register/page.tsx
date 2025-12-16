@@ -17,7 +17,7 @@ import {
 
 export default function RegisterPage() {
     const router = useRouter();
-    const setUser = useStore((state) => state.setUser);
+    const { setUser, setRegisteredUsername } = useStore();
     const [username, setUsername] = useState('');
     const [displayName, setDisplayName] = useState('');
     const [loading, setLoading] = useState(false);
@@ -29,12 +29,26 @@ export default function RegisterPage() {
         setLoading(true);
 
         try {
+            const trimmedUsername = username.trim();
+            const trimmedDisplayName = displayName.trim();
 
-            if (!username.trim()) {
+            if (!trimmedUsername) {
                 throw new AppError('Username is required', ErrorCodes.VALIDATION_ERROR);
             }
 
-            const startResponse = await authApi.registerStart(username, displayName);
+            if (trimmedUsername.length < 3) {
+                throw new AppError('Username must be at least 3 characters', ErrorCodes.VALIDATION_ERROR);
+            }
+
+            if (!trimmedDisplayName) {
+                throw new AppError('Display name is required', ErrorCodes.VALIDATION_ERROR);
+            }
+
+            if (trimmedDisplayName.length < 2) {
+                throw new AppError('Display name must be at least 2 characters', ErrorCodes.VALIDATION_ERROR);
+            }
+
+            const startResponse = await authApi.registerStart(trimmedUsername, trimmedDisplayName);
 
             if (!startResponse) {
                 throw new AppError(
@@ -102,7 +116,7 @@ export default function RegisterPage() {
                 },
             };
 
-            const response = await authApi.registerFinish(username, credentialData);
+            const response = await authApi.registerFinish(trimmedUsername, credentialData);
 
             if (!response.success || !response.username) {
                 throw new AppError(
@@ -111,7 +125,12 @@ export default function RegisterPage() {
                 );
             }
 
+            // Store user data but DON'T set isLoggedIn
+            // They need to actually log in with their passkey
             setUser(response.username, response.user_id, response.display_name);
+            
+            // Store the registered username for auto-fill on login page
+            setRegisteredUsername(response.username);
 
             if (typeof window !== 'undefined') {
                 localStorage.setItem('username', response.username);
@@ -119,11 +138,22 @@ export default function RegisterPage() {
                 localStorage.setItem('display_name', response.display_name);
             }
 
+            // Redirect to login page so they can log in with their newly created passkey
             router.push('/login');
 
         } catch (err: unknown) {
             logError(err, 'Registration');
 
+            // Check for USERNAME_EXISTS error thrown by api.ts
+            if (err instanceof Error && err.message === 'USERNAME_EXISTS') {
+                setError('Username already exists. Redirecting to login...');
+                setTimeout(() => {
+                    router.push('/login');
+                }, 2000);
+                return;
+            }
+
+            // Check for conflict error using errorHandler
             if (isConflictError(err)) {
                 setError('Username already exists. Redirecting to login...');
                 setTimeout(() => {
@@ -132,7 +162,8 @@ export default function RegisterPage() {
                 return;
             }
 
-            if (err instanceof Error && err.message === 'USERNAME_EXISTS') {
+            // Check if error message contains "already exists"
+            if (err instanceof Error && err.message.toLowerCase().includes('already exists')) {
                 setError('Username already exists. Redirecting to login...');
                 setTimeout(() => {
                     router.push('/login');

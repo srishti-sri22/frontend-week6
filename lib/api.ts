@@ -17,6 +17,12 @@ export interface PollOption {
   voters: string[];
 }
 
+interface ErrorResponse {
+  error: string;
+  message: string;
+  details?: string;
+}
+
 export const authApi = {
   registerStart: async (username: string, displayName: string) => {
     const trimmedUsername = username.trim();
@@ -30,15 +36,14 @@ export const authApi = {
     });
 
     if (!res.ok) {
+      const errorText = await res.text();
       if (res.status === 409) {
         throw new Error('USERNAME_EXISTS');
       }
-      // Try to parse JSON error, fallback to text
       try {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || errorData.message || 'Registration failed');
-      } catch (jsonError) {
-        const errorText = await res.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Registration failed');
+      } catch (parseError) {
         throw new Error(errorText || 'Registration failed');
       }
     }
@@ -56,11 +61,11 @@ export const authApi = {
     });
 
     if (!res.ok) {
+      const errorText = await res.text();
       try {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || errorData.message || 'Registration failed');
-      } catch (jsonError) {
-        const errorText = await res.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Registration failed');
+      } catch (parseError) {
         throw new Error(errorText || 'Registration failed');
       }
     }
@@ -78,11 +83,11 @@ export const authApi = {
     });
 
     if (!res.ok) {
+      const errorText = await res.text();
       try {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || errorData.message || 'Authentication start failed');
-      } catch (jsonError) {
-        const errorText = await res.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Authentication start failed');
+      } catch (parseError) {
         throw new Error(errorText || 'Authentication start failed');
       }
     }
@@ -100,11 +105,11 @@ export const authApi = {
     });
 
     if (!res.ok) {
+      const errorText = await res.text();
       try {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || errorData.message || 'Authentication failed');
-      } catch (jsonError) {
-        const errorText = await res.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Authentication failed');
+      } catch (parseError) {
         throw new Error(errorText || 'Authentication failed');
       }
     }
@@ -123,24 +128,23 @@ export const authApi = {
 };
 
 export const pollApi = {
-  createPoll: async (question: string, options: string[], creatorId: string): Promise<Poll> => {
+  createPoll: async (question: string, options: string[]): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         question,
-        options,
-        creator_id: creatorId
+        options
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to create poll');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to create poll');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to create poll');
       }
     }
@@ -153,27 +157,27 @@ export const pollApi = {
       credentials: 'include'
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to fetch poll');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to fetch poll');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to fetch poll');
       }
     }
     return response.json();
   },
 
-  getUserPolls: async (userId: string): Promise<Poll[]> => {
-    const response = await fetch(`${API_BASE_URL}/polls/user/${userId}`, {
+  getUserPolls: async (): Promise<Poll[]> => {
+    const response = await fetch(`${API_BASE_URL}/polls/user/polls`, {
       credentials: 'include'
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to fetch user polls');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to fetch user polls');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to fetch user polls');
       }
     }
@@ -185,18 +189,18 @@ export const pollApi = {
       credentials: 'include'
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to fetch polls');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to fetch polls');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to fetch polls');
       }
     }
     return response.json();
   },
 
-  castVote: async (pollId: string, optionId: string, userId: string): Promise<Poll> => {
+  castVote: async (pollId: string, optionId: string): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/${pollId}/vote`, {
       method: 'POST',
       headers: {
@@ -204,17 +208,16 @@ export const pollApi = {
       },
       credentials: 'include',
       body: JSON.stringify({
-        user_id: userId,
         option_id: optionId
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to cast vote');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to cast vote');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to cast vote');
       }
     }
@@ -222,68 +225,67 @@ export const pollApi = {
     return response.json();
   },
 
-  changeVote: async (pollId: string, userId: string, optionId: string): Promise<Poll> => {
+  changeVote: async (pollId: string, optionId: string): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/${pollId}/change/vote`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
-        user_id: userId,
         option_id: optionId
       }),
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to change vote');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to change vote');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to change vote');
       }
     }
     return response.json();
   },
 
-  closePoll: async (pollId: string, userId: string): Promise<Poll> => {
+  closePoll: async (pollId: string): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/${pollId}/close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({}),
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to close poll');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to close poll');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to close poll');
       }
     }
     return response.json();
   },
 
-  resetPoll: async (pollId: string, userId: string): Promise<Poll> => {
+  resetPoll: async (pollId: string): Promise<Poll> => {
     const response = await fetch(`${API_BASE_URL}/polls/${pollId}/reset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({}),
     });
     if (!response.ok) {
+      const errorText = await response.text();
       try {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.message || 'Failed to reset poll');
-      } catch (jsonError) {
-        const errorText = await response.text();
+        const errorData: ErrorResponse = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to reset poll');
+      } catch (parseError) {
         throw new Error(errorText || 'Failed to reset poll');
       }
     }
     return response.json();
   },
 
-  checkUserVote: async (pollId: string, userId: string): Promise<{ has_voted: boolean; option_id?: string }> => {
-    const response = await fetch(`${API_BASE_URL}/polls/${pollId}/vote/check?user_id=${userId}`, {
+  checkUserVote: async (pollId: string): Promise<{ has_voted: boolean; option_id?: string }> => {
+    const response = await fetch(`${API_BASE_URL}/polls/${pollId}/vote/check`, {
       method: 'GET',
       credentials: 'include',
     });

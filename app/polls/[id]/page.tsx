@@ -30,6 +30,7 @@ export default function PollDetailPage() {
   const [liveUpdates, setLiveUpdates] = useState(true);
   const [sseError, setSseError] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const maxReconnectAttempts = 3;
@@ -41,6 +42,8 @@ export default function PollDetailPage() {
           await fetchPollById(pollId);
         } catch (err) {
           logError(err, 'PollDetailPage - Initial Load');
+        } finally {
+          setInitialLoadComplete(true);
         }
       };
       loadPoll();
@@ -58,7 +61,7 @@ export default function PollDetailPage() {
         eventSource.onmessage = (event) => {
           if (event.data === 'keep-alive') return;
 
-          if (isEditingVote) return; // skip updates while user is voting/changing vote
+          if (isEditingVote) return;
 
           try {
             const updatedPoll: Poll = JSON.parse(event.data);
@@ -203,7 +206,7 @@ export default function PollDetailPage() {
     }
   };
 
-  if (pollsLoading) {
+  if (pollsLoading || !initialLoadComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <Navbar />

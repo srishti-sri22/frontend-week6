@@ -15,7 +15,7 @@ import {
 
 export default function Navbar() {
   const router = useRouter();
-  const { username, isAuthenticated, clearUser } = useStore();
+  const { username, isLoggedIn, clearUser } = useStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutError, setLogoutError] = useState<string>('');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -72,12 +72,11 @@ export default function Navbar() {
                 href="/" 
                 className="text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors duration-200 hover:scale-105 transform"
               >
-                
                 Poll-Sphere
               </Link>
             </div>
 
-            {isAuthenticated && (
+            {isLoggedIn && (
               <div className="hidden lg:flex items-center space-x-1">
                 <Link 
                   href="/" 
@@ -107,7 +106,7 @@ export default function Navbar() {
             )}
 
             <div className="hidden md:flex items-center space-x-3">
-              {isAuthenticated ? (
+              {isLoggedIn ? (
                 <>
                   <span className="text-gray-700 text-sm sm:text-base">
                     Welcome, <strong className="text-blue-600">{username}</strong>
@@ -175,7 +174,7 @@ export default function Navbar() {
 
           {mobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 py-4 animate-fadeIn">
-              {isAuthenticated ? (
+              {isLoggedIn ? (
                 <div className="flex flex-col space-y-2">
                   <div className="px-4 py-2 text-gray-700 text-sm border-b border-gray-100">
                     Welcome, <strong className="text-blue-600">{username}</strong>

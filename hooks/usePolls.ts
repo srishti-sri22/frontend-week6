@@ -41,7 +41,7 @@ export const usePolls = () => {
     try {
       setPollsLoading(true);
       setPollsError(null);
-      const data = await pollApi.getUserPolls(id);
+      const data = await pollApi.getUserPolls();
       setUserPolls(data);
       return data;
     } catch (error: any) {
@@ -74,7 +74,7 @@ export const usePolls = () => {
     try {
       setPollsLoading(true);
       setPollsError(null);
-      const newPoll = await pollApi.createPoll(question, options, creatorId);
+      const newPoll = await pollApi.createPoll(question, options);
       await fetchAllPolls();
       if (creatorId === userId) {
         await fetchUserPolls();
@@ -91,7 +91,7 @@ export const usePolls = () => {
 
   const closePoll = useCallback(async (pollId: string, userIdParam: string) => {
     try {
-      await pollApi.closePoll(pollId, userIdParam);
+      await pollApi.closePoll(pollId);
       await fetchPollById(pollId);
       await fetchUserPolls();
     } catch (error: any) {
@@ -101,7 +101,7 @@ export const usePolls = () => {
 
   const resetPoll = useCallback(async (pollId: string, userIdParam: string) => {
     try {
-      await pollApi.resetPoll(pollId, userIdParam);
+      await pollApi.resetPoll(pollId);
       await fetchPollById(pollId);
       await fetchUserPolls();
     } catch (error: any) {
