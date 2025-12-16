@@ -28,7 +28,7 @@ export const useVotes = (pollId?: string) => {
           return { has_voted: true, option_id: localVote.optionId };
         }
 
-        const voteCheck = await pollApi.checkUserVote(pollIdParam, userIdParam);
+        const voteCheck = await pollApi.checkUserVote(pollIdParam);
 
         if (!voteCheck.has_voted) {
           clearUserVote(pollIdParam);
@@ -58,7 +58,7 @@ export const useVotes = (pollId?: string) => {
 
   const castVote = useCallback(
     async (pollIdParam: string, optionId: string, userIdParam: string) => {
-      const result = await pollApi.castVote(pollIdParam, optionId, userIdParam);
+      const result = await pollApi.castVote(pollIdParam, optionId);
       addUserVote(pollIdParam, optionId);
       setHasVoted(true);
       setVotedOptionId(optionId);
@@ -69,7 +69,7 @@ export const useVotes = (pollId?: string) => {
 
   const changeVote = useCallback(
     async (pollIdParam: string, userIdParam: string, optionId: string) => {
-      const result = await pollApi.changeVote(pollIdParam, userIdParam, optionId);
+      const result = await pollApi.changeVote(pollIdParam, userIdParam);
       updateUserVote(pollIdParam, optionId);
       setHasVoted(true);
       setVotedOptionId(optionId);
